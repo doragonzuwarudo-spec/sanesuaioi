@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ツールボックス (画像生成 & チャット)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 650px;
+            margin: 0 auto;
+            padding: 20px 15px;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #222;
+        }
+
+        /* タブ切替ナビゲーション */
+        .tab-container {
+            display: flex;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            color: #666;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tab-btn.active {
+            background-color: #ffffff;
+            color: #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* 各セクション表示切り替え */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 入力フォーム共通 */
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 14px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #007bff;
+        }
+        button.action-btn {
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        button.action-btn:hover {
+            background-color: #0056b3;
+        }
+        button.action-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 画像生成スタイリング */
+        .download-btn {
+            background-color: #28a745;
+            margin-top: 15px;
+            width: 100%;
+            display: none;
+        }
+        .download-btn:hover {
+            background-color: #218838;
+        }
+        #result-container {
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        #result-image {
+            width: 100%;
+            height: auto;
+            display: none;
+        }
+        #loading-img {
+            display: none;
+            font-weight: bold;
+            color: #555;
+        }
+
+        /* チャットエリアスタイリング */
+        #chat-box {
+            height: 380px;
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .message {
+            position: relative;
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: #007bff;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+        .message.bot {
+            align-self: flex-start;
+            background-color: #f1f3f5;
+            color: #333;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #e9ecef;
+            padding-bottom: 28px; /* コピーボタン用スペース */
+        }
+        .message.system-error {
+            align-self: center;
+            background-color: #ffe3e3;
+            color: #dc3545;
+            font-size: 12px;
+        }
+        .message-image {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+        .message-image:hover {
+            opacity: 0.9;
+        }
+
+        /* メッセージ用コピーボタン */
+        .copy-btn {
+            position: absolute;
+            bottom: 4px;
+            right: 8px;
+            font-size: 11px;
+            padding: 2px 6px;
+            background-color: #e0e0e0;
+            color: #555;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .copy-btn:hover {
+            background-color: #007bff;
+            color: white;
+        }
+
+        /* チャット入力エリア拡張 */
+        .chat-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        #chat-input {
+            flex: 1;
+            min-width: 150px;
+        }
+        .file-input-wrapper {
+            position: relative;
+        }
+        #image-upload {
+            display: none;
+        }
+        .icon-btn {
+            padding: 12px 14px;
+            font-size: 16px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .icon-btn:hover {
+            background-color: #5a6268;
+        }
+        .icon-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 音声読み上げON/OFFボタン スタイル */
+        .tts-btn {
+            background-color: #28a745;
+        }
+        .tts-btn.muted {
+            background-color: #dc3545;
+        }
+
+        /* マイク録音中アニメーション */
+        .mic-active {
+            background-color: #dc3545 !important;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* プレビュー表示 */
+        #image-preview {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: none;
+            border: 2px solid #007bff;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AI ツールボックス</h1>
+
+    <!-- タブメニュー -->
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchTab('image-tab')">🎨 画像生成</button>
+        <button class="tab-btn" onclick="switchTab('chat-tab')">💬 AIチャット</button>
+    </div>
+
+    <!-- 画像生成セクション -->
+    <div id="image-tab" class="tab-content active">
+        <div class="input-group">
+            <input type="text" id="prompt" placeholder="生成したい画像の説明を入力..." value="A futuristic city at sunset, highly detailed">
+            <button id="generate-btn" class="action-btn" onclick="generateImage()">生成</button>
+        </div>
+
+        <div id="result-container">
+            <div id="loading-img">画像を生成中...（数秒かかります）</div>
+            <img id="result-image" alt="生成された画像" crossorigin="anonymous">
+        </div>
+
+        <button id="download-btn" class="action-btn download-btn" onclick="downloadImage()">画像を保存する</button>
+    </div>
+
+    <!-- AIチャットセクション -->
+    <div id="chat-tab" class="tab-content">
+        <div id="chat-box">
+            <div class="message bot">こんにちは！質問や相談など何でも話しかけてください。画像もアップロードできます。🎤ボタンで音声入力、🔊ボタンで読み上げON/OFFの切替が可能です。
+                <button class="copy-btn" onclick="copyMessageText(this)">📋 コピー</button>
+            </div>
+        </div>
+
+        <img id="image-preview" alt="プレビュー">
+
+        <div class="chat-input-group">
+            <div class="file-input-wrapper">
+                <input type="file" id="image-upload" accept="image/*">
+                <button class="icon-btn" onclick="document.getElementById('image-upload').click()" title="画像をアップロード">📷</button>
+            </div>
+            <!-- 音声入力マイクボタン -->
+            <button id="mic-btn" class="icon-btn" onclick="toggleSpeechRecognition()" title="音声入力">🎤</button>
+            <!-- 読み上げON/OFFボタン -->
+            <button id="tts-btn" class="icon-btn tts-btn" onclick="toggleTTS()" title="読み上げON/OFF">🔊</button>
+            <input type="text" id="chat-input" placeholder="メッセージを入力..." onkeydown="if(event.key==='Enter') sendMessage()">
+            <button id="send-btn" class="action-btn" onclick="sendMessage()">送信</button>
+        </div>
+    </div>
+
+    <script>
+        // タブ切り替え処理
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // メッセージテキストコピー処理
+        function copyMessageText(btnElement) {
+            const messageDiv = btnElement.parentElement;
+            // ボタン要素以外のテキスト内容を取得
+            const textToCopy = Array.from(messageDiv.childNodes)
+                .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('copy-btn')))
+                .map(node => node.textContent)
+                .join('').trim();
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalText = btnElement.textContent;
+                btnElement.textContent = '✓ コピー完了！';
+                btnElement.style.backgroundColor = '#28a745';
+                btnElement.style.color = '#fff';
+                setTimeout(() => {
+                    btnElement.textContent = originalText;
+                    btnElement.style.backgroundColor = '';
+                    btnElement.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('コピー失敗:', err);
+            });
+        }
+
+        // ================= 画像生成機能 =================
+        function generateImage() {
+            const promptInput = document.getElementById('prompt');
+            const promptText = promptInput.value.trim();
+            const generateBtn = document.getElementById('generate-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const loadingText = document.getElementById('loading-img');
+            const resultImg = document.getElementById('result-image');
+
+            if (!promptText) {
+                alert('プロンプトを入力してください。');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            resultImg.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            loadingText.style.display = 'block';
+
+            const encodedPrompt = encodeURIComponent(promptText);
+            const randomSeed = Math.floor(Math.random() * 1000000);
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${randomSeed}`;
+
+            resultImg.onload = function() {
+                loadingText.style.display = 'none';
+                resultImg.style.display = 'block';
+                downloadBtn.style.display = 'block';
+                generateBtn.disabled = false;
+            };
+
+            resultImg.onerror = function() {
+                loadingText.style.display = 'none';
+                alert('画像の生成に失敗しました。もう一度お試しください。');
+                generateBtn.disabled = false;
+            };
+
+            resultImg.src = imageUrl;
+        }
+
+        async function downloadImage() {
+            const resultImg = document.getElementById('result-image');
+            const downloadBtn = document.getElementById('download-btn');
+            if (!resultImg.src) return;
+
+            try {
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'ダウンロード中...';
+
+                const response = await fetch(resultImg.src);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `ai-image-${Date.now()}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch (error) {
+                alert('画像のダウンロードに失敗しました。');
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '画像を保存する';
+            }
+        }
+
+        // ================= AIチャット機能 =================
+        const chatMessages = [
+            { role: 'system', content: 'あなたは親切で分かりやすい日本語のAIアシスタントです。' }
+        ];
+
+        let uploadedImageBase64 = null;
+        let uploadedImageName = null;
+        let isTTSEnabled = true; // 読み上げ機能の初期状態（ON）
+
+        // 画像アップロード処理
+        document.getElementById('image-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                uploadedImageBase64 = event.target.result;
+                uploadedImageName = file.name;
+
+                // プレビュー表示
+                const preview = document.getElementById('image-preview');
+                preview.src = uploadedImageBase64;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // ================= 音声認識・音声合成（ボイスチャット機能） =================
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isRecording = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.interimResults = false;
+            recognition.continuous = false;
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                const input = document.getElementById('chat-input');
+                input.value = transcript;
+                stopRecording();
+            };
+
+            recognition.onerror = function(event) {
+                console.error('音声認識エラー:', event.error);
+                stopRecording();
+            };
+
+            recognition.onend = function() {
+                stopRecording();
+            };
+        }
+
+        function toggleSpeechRecognition() {
+            if (!SpeechRecognition) {
+                alert('お使いのブラウザは音声認識に対応していません。（Chrome/Edge/Safari推奨）');
+                return;
+            }
+
+            if (isRecording) {
+                recognition.stop();
+                stopRecording();
+            } else {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    const micBtn = document.getElementById('mic-btn');
+                    micBtn.classList.add('mic-active');
+                    document.getElementById('chat-input').placeholder = '話し合ってください...';
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            const micBtn = document.getElementById('mic-btn');
+            if (micBtn) micBtn.classList.remove('mic-active');
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) chatInput.placeholder = 'メッセージを入力...';
+        }
+
+        // 読み上げON/OFFの切替機能
+        function toggleTTS() {
+            isTTSEnabled = !isTTSEnabled;
+            const ttsBtn = document.getElementById('tts-btn');
+
+            if (isTTSEnabled) {
+                ttsBtn.textContent = '🔊';
+                ttsBtn.classList.remove('muted');
+                ttsBtn.title = '読み上げON（クリックでOFF）';
+            } else {
+                ttsBtn.textContent = '🔇';
+                ttsBtn.classList.add('muted');
+                ttsBtn.title = '読み上げOFF（クリックでON）';
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+            }
+        }
+
+        // 音声読み上げ機能 (Text-to-Speech)
+        function speakText(text) {
+            if (!isTTSEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ja-JP';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            const sendBtn = document.getElementById('send-btn');
+            const chatBox = document.getElementById('chat-box');
+            const imageUpload = document.getElementById('image-upload');
+
+            if (!text && !uploadedImageBase64) return;
+
+            // ユーザーメッセージを追加（テキスト部分）
+            if (text) {
+                appendMessage('user', text);
+                chatMessages.push({ role: 'user', content: text });
+            }
+
+            // 画像があれば表示
+            if (uploadedImageBase64) {
+                const imgMsg = appendMessage('user', '');
+                const img = document.createElement('img');
+                img.src = uploadedImageBase64;
+                img.className = 'message-image';
+                img.title = uploadedImageName;
+                imgMsg.appendChild(img);
+                
+                // 画像をメッセージに含める
+                chatMessages.push({
+                    role: 'user',
+                    content: `[画像: ${uploadedImageName}] ${text || '(画像の説明をお願いします)'}`
+                });
+            }
+
+            input.value = '';
+            uploadedImageBase64 = null;
+            uploadedImageName = null;
+            document.getElementById('image-preview').style.display = 'none';
+            imageUpload.value = '';
+
+            // 入力ロック & ローディング吹き出し追加
+            sendBtn.disabled = true;
+            const loadingMsg = appendMessage('bot', '回答を作成中...');
+
+            try {
+                // Pollinations.ai のテキスト API にリクエスト
+                const response = await fetch('https://text.pollinations.ai/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: chatMessages,
+                        model: 'openai'
+                    })
+                });
+
+                if (!response.ok) throw new Error('API通信エラー');
+
+                const replyText = await response.text();
+
+                // ロード表示を回答に置き換え
+                loadingMsg.textContent = replyText;
+                
+                // コピーボタンの再設定
+                if (loadingMsg.classList.contains('bot')) {
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.textContent = '📋 コピー';
+                    copyBtn.onclick = function() { copyMessageText(this); };
+                    loadingMsg.appendChild(copyBtn);
+                }
+
+                chatMessages.push({ role: 'assistant', content: replyText });
+
+                // 回答を音声で読み上げ
+                speakText(replyText);
+
+            } catch (error) {
+                console.error(error);
+                loadingMsg.textContent = '申し訳ありません。回答の取得に失敗しました。';
+                loadingMsg.classList.add('system-error');
+            } finally {
+                sendBtn.disabled = false;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        function appendMessage(role, text) {
+            const chatBox = document.getElementById('chat-box');
+            const msgEl = document.createElement('div');
+            msgEl.className = `message ${role}`;
+            msgEl.textContent = text;
+
+            // AIの返答メッセージにコピーボタンを追加
+            if (role === 'bot' && text !== '回答を作成中...') {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = '📋 コピー';
+                copyBtn.onclick = function() { copyMessageText(this); };
+                msgEl.appendChild(copyBtn);
+            }
+
+            chatBox.appendChild(msgEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return msgEl;
+        }
+    </script>
+
+</body>
+</html>
